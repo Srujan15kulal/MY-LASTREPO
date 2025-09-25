@@ -67,6 +67,55 @@ export const getPatientReports = (patientId: string) => {
   ];
 };
 
+export const getPatientMedications = (patientId: string) => {
+  return [
+    {
+      id: 'med-001',
+      patient_id: patientId,
+      medicine_name: 'Metformin',
+      dosage: '500mg',
+      frequency: 'Twice daily',
+      prescribed_by: 'Dr. A. Sharma',
+      start_date: '2023-01-15',
+      end_date: null,
+      created_at: '2023-01-15T10:00:00Z'
+    },
+    {
+      id: 'med-002',
+      patient_id: patientId,
+      medicine_name: 'Lisinopril',
+      dosage: '10mg',
+      frequency: 'Once daily',
+      prescribed_by: 'Dr. R. Kumar',
+      start_date: '2023-03-20',
+      end_date: null,
+      created_at: '2023-03-20T14:30:00Z'
+    },
+    {
+      id: 'med-003',
+      patient_id: patientId,
+      medicine_name: 'Atorvastatin',
+      dosage: '20mg',
+      frequency: 'Once daily (evening)',
+      prescribed_by: 'Dr. P. Patel',
+      start_date: '2023-06-10',
+      end_date: '2024-06-10',
+      created_at: '2023-06-10T09:15:00Z'
+    },
+    {
+      id: 'med-004',
+      patient_id: patientId,
+      medicine_name: 'Vitamin D3',
+      dosage: '1000 IU',
+      frequency: 'Once daily',
+      prescribed_by: 'Dr. S. Mehta',
+      start_date: '2024-01-05',
+      end_date: null,
+      created_at: '2024-01-05T11:45:00Z'
+    }
+  ];
+};
+
 export const getPatientAllergies = (patientId: string) => {
   return [
     {

@@ -65,3 +65,15 @@ export interface TestRequest {
   status: 'Requested' | 'Sample Collected' | 'In Progress' | 'Completed';
   date: string;
 }
+
+export interface RegularMedication {
+  id: string;
+  patient_id: string;
+  medicine_name: string;
+  dosage: string;
+  frequency: string;
+  prescribed_by: string;
+  start_date: string;
+  end_date: string | null;
+  created_at: string;
+}

@@ -3,13 +3,35 @@ import { useParams } from 'react-router-dom';
 import { Header } from '../Layout/Header';
 import { Card } from '../Common/Card';
 import { Button } from '../Common/Button';
-import { User, FileText, TestTube, Activity, AlertCircle, Stethoscope } from 'lucide-react';
+import { User, FileText, TestTube, Activity, AlertCircle, Stethoscope, X } from 'lucide-react';
 import { mockPatients } from '../../data/mockData';
+import { getPatientMedications } from '../../data/patientData';
+
+interface RegularMedication {
+  id: string;
+  patient_id: string;
+  medicine_name: string;
+  dosage: string;
+  frequency: string;
+  prescribed_by: string;
+  start_date: string;
+  end_date: string | null;
+  created_at: string;
+}
 
 export const PatientDetail: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const [activeTab, setActiveTab] = useState('overview');
   const [showActionModal, setShowActionModal] = useState<string | null>(null);
+  const [showMedicationModal, setShowMedicationModal] = useState(false);
+  const [medicationForm, setMedicationForm] = useState({
+    medicine_name: '',
+    dosage: '',
+    frequency: '',
+    prescribed_by: 'Dr. Ramesh',
+    start_date: new Date().toISOString().split('T')[0],
+    end_date: ''
+  });
 
   const patient = mockPatients.find(p => p.patient_id === patientId) || mockPatients[0];
 
@@ -17,7 +39,8 @@ export const PatientDetail: React.FC = () => {
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'history', label: 'History', icon: FileText },
     { id: 'reports', label: 'Reports', icon: Activity },
-    { id: 'allergies', label: 'Allergies', icon: AlertCircle }
+    { id: 'allergies', label: 'Allergies', icon: AlertCircle },
+    { id: 'medications', label: 'Regular Medications', icon: TestTube }
   ];
 
   const actions = [
@@ -26,6 +49,24 @@ export const PatientDetail: React.FC = () => {
     { id: 'physiotherapy', label: 'Request Physiotherapy' },
     { id: 'psychiatry', label: 'Request Psychiatry' }
   ];
+
+  const handleAddMedication = () => {
+    // Simulate API call to add medication
+    const newMedication = {
+      id: `med-${Date.now()}`,
+      patient_id: patient.patient_id,
+      ...medicationForm,
+      created_at: new Date().toISOString()
+    };
+    
+    alert(`Medication added successfully!\nMedicine: ${medicationForm.medicine_name}\nDosage: ${medicationForm.dosage}\nFrequency: ${medicationForm.frequency}`);
+    
+    setShowMedicationModal(false);
+    setMedicationForm({
+      medicine_name: '', dosage: '', frequency: '', prescribed_by: 'Dr. Ramesh',
+      start_date: new Date().toISOString().split('T')[0], end_date: ''
+    });
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -94,6 +135,47 @@ export const PatientDetail: React.FC = () => {
             </div>
           </div>
         );
+      case 'medications':
+        const medications = getPatientMedications(patient.patient_id);
+        return (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-gray-900">Current Regular Medications</h4>
+              <button
+                onClick={() => setShowMedicationModal(true)}
+                className="px-3 py-1 bg-black text-white text-sm hover:bg-gray-800 transition-colors"
+              >
+                + Add Medication
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 font-medium text-gray-700">Medicine</th>
+                    <th className="text-left py-2 font-medium text-gray-700">Dosage</th>
+                    <th className="text-left py-2 font-medium text-gray-700">Frequency</th>
+                    <th className="text-left py-2 font-medium text-gray-700">Prescribed By</th>
+                    <th className="text-left py-2 font-medium text-gray-700">Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {medications.map((medication) => (
+                    <tr key={medication.id} className="border-b border-gray-100">
+                      <td className="py-3 font-medium text-gray-900">{medication.medicine_name}</td>
+                      <td className="py-3 text-gray-700">{medication.dosage}</td>
+                      <td className="py-3 text-gray-700">{medication.frequency}</td>
+                      <td className="py-3 text-gray-700">{medication.prescribed_by}</td>
+                      <td className="py-3 text-gray-700">
+                        {medication.start_date} {medication.end_date ? `- ${medication.end_date}` : '- Ongoing'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
       case 'allergies':
         return (
           <div className="space-y-2">
@@ -105,6 +187,95 @@ export const PatientDetail: React.FC = () => {
       default:
         return null;
     }
+  };
+
+  const MedicationModal = () => {
+    if (!showMedicationModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg max-w-md w-full">
+          <div className="flex items-center justify-between p-6 border-b">
+            <h3 className="text-lg font-semibold text-gray-900">Add Regular Medication</h3>
+            <button
+              onClick={() => setShowMedicationModal(false)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X size={20} className="text-gray-500" />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Medicine Name *</label>
+              <input
+                type="text"
+                value={medicationForm.medicine_name}
+                onChange={(e) => setMedicationForm(prev => ({ ...prev, medicine_name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                placeholder="e.g., Metformin"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dosage *</label>
+              <input
+                type="text"
+                value={medicationForm.dosage}
+                onChange={(e) => setMedicationForm(prev => ({ ...prev, dosage: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                placeholder="e.g., 500mg"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Frequency *</label>
+              <input
+                type="text"
+                value={medicationForm.frequency}
+                onChange={(e) => setMedicationForm(prev => ({ ...prev, frequency: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                placeholder="e.g., Twice daily"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+              <input
+                type="date"
+                value={medicationForm.start_date}
+                onChange={(e) => setMedicationForm(prev => ({ ...prev, start_date: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">End Date (Optional)</label>
+              <input
+                type="date"
+                value={medicationForm.end_date}
+                onChange={(e) => setMedicationForm(prev => ({ ...prev, end_date: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 p-6 border-t">
+            <button
+              onClick={handleAddMedication}
+              className="flex-1 px-4 py-2 bg-black text-white hover:bg-gray-800 transition-colors"
+              disabled={!medicationForm.medicine_name || !medicationForm.dosage || !medicationForm.frequency}
+            >
+              Add Medication
+            </button>
+            <button
+              onClick={() => setShowMedicationModal(false)}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const ActionModal = () => {
@@ -228,6 +399,7 @@ export const PatientDetail: React.FC = () => {
       </div>
 
       <ActionModal />
+      <MedicationModal />
     </div>
   );
 };
