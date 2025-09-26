@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../lib/supabase';
 import { Header } from '../Layout/Header';
 import { Card } from '../Common/Card';
 import { Button } from '../Common/Button';
+import { Toast, useToast } from '../Common/Toast';
 import { Calendar, Clock, User, Users, FileText, Search, TestTube, Activity, AlertCircle, Stethoscope } from 'lucide-react';
-import { mockDoctors, mockAppointments, mockPatients } from '../../data/mockData';
-import { getPatientHistory, getPatientReports, getPatientAllergies, getPatientMedications } from '../../data/patientData';
 
 interface RegularMedication {
   id: string;
@@ -21,26 +23,57 @@ interface RegularMedication {
 
 export const DoctorDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const doctor = mockDoctors[0];
+  const { profile } = useAuth();
+  const { toast, showToast, hideToast } = useToast();
+  
+  // State
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [patients, setPatients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [showActionModal, setShowActionModal] = useState<string | null>(null);
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
-  const [requestedTests, setRequestedTests] = useState<{patientId: string, tests: string[], timestamp: string}[]>([]);
   const [showMedicationModal, setShowMedicationModal] = useState(false);
   const [medicationForm, setMedicationForm] = useState({
     medicine_name: '',
     dosage: '',
     frequency: '',
-    prescribed_by: 'Dr. Ramesh',
+    prescribed_by: profile?.full_name || '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: ''
   });
 
-  const filteredPatients = mockPatients.filter(patient => 
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.patient_id.toLowerCase().includes(searchTerm.toLowerCase())
+  // Load data on component mount
+  useEffect(() => {
+    if (profile) {
+      loadDashboardData();
+    }
+  }, [profile]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load appointments for this doctor
+      const appointmentsData = await db.getAppointments(profile.id);
+      setAppointments(appointmentsData || []);
+      
+      // Load all patients (in a real app, you might want to limit this)
+      const patientsData = await db.getPatients();
+      setPatients(patientsData || []);
+      
+    } catch (error: any) {
+      showToast(error.message || 'Failed to load dashboard data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredPatients = patients.filter(patient => 
+    patient.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handlePatientSelect = (patient: any) => {
@@ -67,21 +100,35 @@ export const DoctorDashboard: React.FC = () => {
   const handleAddMedication = () => {
     if (!selectedPatient) return;
     
-    // Simulate API call to add medication
-    const newMedication = {
-      id: `med-${Date.now()}`,
-      patient_id: selectedPatient.patient_id,
-      ...medicationForm,
-      created_at: new Date().toISOString()
+    const addMedication = async () => {
+      try {
+        await db.addMedication({
+          patient_id: selectedPatient.id,
+          prescribed_by: profile.id,
+          name: medicationForm.medicine_name,
+          dose: medicationForm.dosage,
+          frequency: medicationForm.frequency,
+          start_date: medicationForm.start_date,
+          end_date: medicationForm.end_date || null
+        });
+        
+        showToast('Medication added successfully!', 'success');
+        setShowMedicationModal(false);
+        setMedicationForm({
+          medicine_name: '', 
+          dosage: '', 
+          frequency: '', 
+          prescribed_by: profile?.full_name || '',
+          start_date: new Date().toISOString().split('T')[0], 
+          end_date: ''
+        });
+        
+      } catch (error: any) {
+        showToast(error.message || 'Failed to add medication', 'error');
+      }
     };
     
-    alert(`Medication added successfully!\nMedicine: ${medicationForm.medicine_name}\nDosage: ${medicationForm.dosage}\nFrequency: ${medicationForm.frequency}`);
-    
-    setShowMedicationModal(false);
-    setMedicationForm({
-      medicine_name: '', dosage: '', frequency: '', prescribed_by: 'Dr. Ramesh',
-      start_date: new Date().toISOString().split('T')[0], end_date: ''
-    });
+    addMedication();
   };
 
   const renderTabContent = () => {
@@ -94,15 +141,11 @@ export const DoctorDashboard: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-600">Patient Name</label>
-                <p className="text-gray-900">{selectedPatient.name}</p>
+                <p className="text-gray-900">{selectedPatient.display_name}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Patient ID</label>
-                <p className="text-gray-900">{selectedPatient.patient_id}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Age</label>
-                <p className="text-gray-900">{selectedPatient.age} years</p>
+                <p className="text-gray-900">{selectedPatient.id}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Gender</label>
@@ -110,83 +153,37 @@ export const DoctorDashboard: React.FC = () => {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Phone</label>
-                <p className="text-gray-900">{selectedPatient.phone_number}</p>
+                <p className="text-gray-900">{selectedPatient.phone}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-600">Aadhar</label>
-                <p className="text-gray-900">{selectedPatient.aadhar_number}</p>
+                <label className="text-sm font-medium text-gray-600">Date of Birth</label>
+                <p className="text-gray-900">{selectedPatient.dob}</p>
               </div>
             </div>
           </div>
         );
       case 'history':
-        const history = getPatientHistory(selectedPatient.patient_id);
         return (
           <div className="space-y-4">
             <div>
               <h4 className="font-medium text-gray-900 mb-2">Medical History</h4>
-              <p className="text-gray-700 mb-4">{history.medicalHistory}</p>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-3">Recent Prescriptions</h4>
-              <div className="space-y-3">
-                {history.prescriptions.map((prescription, index) => (
-                  <div key={index} className="p-3 bg-gray-50">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-gray-900">{prescription.medicine}</span>
-                    </div>
-                    <p className="text-sm text-gray-600">Quantity: {prescription.quantity}</p>
-                    <p className="text-sm text-gray-500">Prescribed by {prescription.prescribedBy} on {prescription.dateTime}</p>
-                  </div>
-                ))}
-              </div>
+              <p className="text-gray-700 mb-4">Medical history will be loaded from database...</p>
             </div>
           </div>
         );
       case 'reports':
-        const reports = getPatientReports(selectedPatient.patient_id);
         return (
           <div className="space-y-3">
-            {reports.map((report, index) => (
-              <div key={index} className="flex justify-between items-center p-3 bg-gray-50">
-                <div>
-                  <h4 className="font-medium">{report.name}</h4>
-                  <p className="text-sm text-gray-600">{report.date}</p>
-                  <p className="text-sm text-gray-500">Uploaded by {report.uploadedBy}</p>
-                </div>
-                <div className="flex gap-2">
-                  <span className="px-3 py-1 bg-green-100 text-green-800 text-sm">
-                    {report.status}
-                  </span>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => navigate(`/report/${report.reportId}`)}
-                  >
-                    View
-                  </Button>
-                </div>
-              </div>
-            ))}
+            <p className="text-gray-600">Lab reports will be loaded from database...</p>
           </div>
         );
       case 'allergies':
-        const allergies = getPatientAllergies(selectedPatient.patient_id);
         return (
           <div className="space-y-2">
-            {allergies.map((allergy, index) => (
-              <div key={index} className="p-3 bg-red-50">
-                <div className="flex items-center justify-between">
-                  <p className="text-red-800 font-medium">{allergy.name}</p>
-                  <span className="text-xs text-red-600">{allergy.severity} Risk</span>
-                </div>
-                <p className="text-sm text-red-700 mt-1">{allergy.description}</p>
-              </div>
-            ))}
+            <p className="text-gray-600">Patient allergies will be loaded from database...</p>
           </div>
         );
       case 'medications':
-        const medications = getPatientMedications(selectedPatient.patient_id);
         return (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -198,32 +195,7 @@ export const DoctorDashboard: React.FC = () => {
                 + Add Medication
               </button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 font-medium text-gray-700">Medicine</th>
-                    <th className="text-left py-2 font-medium text-gray-700">Dosage</th>
-                    <th className="text-left py-2 font-medium text-gray-700">Frequency</th>
-                    <th className="text-left py-2 font-medium text-gray-700">Prescribed By</th>
-                    <th className="text-left py-2 font-medium text-gray-700">Duration</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {medications.map((medication) => (
-                    <tr key={medication.id} className="border-b border-gray-100">
-                      <td className="py-3 font-medium text-gray-900">{medication.medicine_name}</td>
-                      <td className="py-3 text-gray-700">{medication.dosage}</td>
-                      <td className="py-3 text-gray-700">{medication.frequency}</td>
-                      <td className="py-3 text-gray-700">{medication.prescribed_by}</td>
-                      <td className="py-3 text-gray-700">
-                        {medication.start_date} {medication.end_date ? `- ${medication.end_date}` : '- Ongoing'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <p className="text-gray-600">Patient medications will be loaded from database...</p>
           </div>
         );
       default:
@@ -247,13 +219,22 @@ export const DoctorDashboard: React.FC = () => {
 
     const handleConfirmTests = () => {
       if (selectedTests.length > 0 && selectedPatient) {
-        const newRequest = {
-          patientId: selectedPatient.patient_id,
-          tests: [...selectedTests],
-          timestamp: new Date().toLocaleString()
+        // Create lab request
+        const createLabRequest = async () => {
+          try {
+            await db.createLabRequest({
+              patient_id: selectedPatient.id,
+              requested_by: profile.id,
+              tests: selectedTests
+            });
+            
+            showToast(`Successfully requested ${selectedTests.join(', ')} for ${selectedPatient.display_name}`, 'success');
+          } catch (error: any) {
+            showToast(error.message || 'Failed to create lab request', 'error');
+          }
         };
-        setRequestedTests(prev => [...prev, newRequest]);
-        alert(`Successfully requested ${selectedTests.join(', ')} for ${selectedPatient.name}`);
+        
+        createLabRequest();
         setSelectedTests([]);
         setShowActionModal(null);
       }
@@ -428,6 +409,13 @@ export const DoctorDashboard: React.FC = () => {
       <Header title="Doctor Dashboard" />
       
       <div className="max-w-6xl mx-auto p-6">
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading dashboard...</p>
+          </div>
+        ) : (
+          <>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
           {/* Doctor Profile */}
           <Card>
@@ -436,15 +424,12 @@ export const DoctorDashboard: React.FC = () => {
               <h3 className="font-semibold text-black">Doctor Profile</h3>
             </div>
             <div className="text-center">
-              <img
-                src={doctor.photo_url}
-                alt={doctor.name}
-                className="w-16 h-16 rounded-full mx-auto mb-3 object-cover"
-              />
-              <h4 className="font-medium text-black mb-1">{doctor.name}</h4>
-              <p className="text-sm text-gray-600 mb-2">{doctor.qualification}</p>
-              <p className="text-sm font-medium text-black mb-2">{doctor.department}</p>
-              <p className="text-sm text-gray-600">{doctor.contact_number}</p>
+              <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-3 flex items-center justify-center">
+                <User size={32} className="text-gray-600" />
+              </div>
+              <h4 className="font-medium text-black mb-1">{profile?.full_name}</h4>
+              <p className="text-sm text-gray-600 mb-2">{profile?.role}</p>
+              <p className="text-sm text-gray-600">{profile?.email}</p>
               <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate('/doctor/profile')}>
                 View Profile
               </Button>
@@ -473,8 +458,8 @@ export const DoctorDashboard: React.FC = () => {
                       className="p-2 hover:bg-gray-50 cursor-pointer"
                       onClick={() => handlePatientSelect(patient)}
                     >
-                      <p className="font-medium">{patient.name}</p>
-                      <p className="text-sm text-gray-600">{patient.patient_id}</p>
+                      <p className="font-medium">{patient.display_name}</p>
+                      <p className="text-sm text-gray-600">{patient.id}</p>
                     </div>
                   ))}
                 </div>
@@ -491,15 +476,15 @@ export const DoctorDashboard: React.FC = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Total Appointments</span>
-                <span className="font-medium">{mockAppointments.length}</span>
+                <span className="font-medium">{appointments.length}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Completed</span>
-                <span className="font-medium">8</span>
+                <span className="font-medium">{appointments.filter(a => a.status === 'completed').length}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Pending</span>
-                <span className="font-medium">4</span>
+                <span className="font-medium">{appointments.filter(a => a.status === 'waiting').length}</span>
               </div>
             </div>
           </Card>
@@ -594,7 +579,7 @@ export const DoctorDashboard: React.FC = () => {
               {/* Current Problem */}
               <Card>
                 <h3 className="font-semibold text-gray-900 mb-3">Current Problem</h3>
-                <p className="text-sm text-gray-700">{selectedPatient.problem_description}</p>
+                <p className="text-sm text-gray-700">{selectedPatient.problem_description || 'No current problems recorded'}</p>
               </Card>
             </div>
           </div>
@@ -611,12 +596,12 @@ export const DoctorDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            {mockAppointments.map((appointment) => (
+            {appointments.slice(0, 5).map((appointment) => (
               <div
                 key={appointment.appointment_id}
                 className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
                 onClick={() => {
-                  const patient = mockPatients.find(p => p.patient_id === appointment.patient_id);
+                  const patient = patients.find(p => p.id === appointment.patient_id);
                   if (patient) handlePatientSelect(patient);
                 }}
               >
@@ -625,22 +610,31 @@ export const DoctorDashboard: React.FC = () => {
                     <User size={20} className="text-gray-700" />
                   </div>
                   <div>
-                    <h4 className="font-medium text-gray-900">{appointment.patient_name}</h4>
-                    <p className="text-sm text-gray-600">{appointment.reason}</p>
+                    <h4 className="font-medium text-gray-900">{appointment.patients?.display_name}</h4>
+                    <p className="text-sm text-gray-600">{appointment.problem_summary}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-medium text-gray-900">{appointment.time}</p>
-                  <p className="text-sm text-gray-600">Age: {appointment.age}</p>
+                  <h2 className="text-xl font-semibold text-black">{selectedPatient.display_name}</h2>
+                  <p className="font-medium text-gray-900">{new Date(appointment.scheduled_at).toLocaleTimeString()}</p>
+                  <p className="text-sm text-gray-600">{appointment.status}</p>
                 </div>
               </div>
             ))}
           </div>
         </Card>
+        </>
+        )}
       </div>
 
       <ActionModal />
       <MedicationModal />
+      
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 };

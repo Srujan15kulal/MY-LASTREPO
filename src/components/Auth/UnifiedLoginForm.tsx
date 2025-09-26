@@ -4,16 +4,21 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../Common/Button';
 import { FormField } from '../Common/FormField';
 import { Card } from '../Common/Card';
+import { Toast, useToast } from '../Common/Toast';
 import { Building2 } from 'lucide-react';
 
 export const UnifiedLoginForm: React.FC = () => {
   const [credentials, setCredentials] = useState({
-    username: '',
+    email: '',
     password: '',
     role: ''
   });
-  const { login } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const { toast, showToast, hideToast } = useToast();
 
   const roleOptions = [
     'Doctor',
@@ -26,36 +31,60 @@ export const UnifiedLoginForm: React.FC = () => {
   const roleConfig = {
     'Doctor': {
       dashboardPath: '/doctor/dashboard',
-      userData: { id: 'D-501', role: 'doctor' as const, name: 'Dr. Ramesh' }
+      role: 'doctor'
     },
     'Patient': {
       dashboardPath: '/patient/dashboard',
-      userData: { id: 'P-1001', role: 'patient' as const, name: 'Ravi Kumar' }
+      role: 'patient'
     },
     'Receptionist': {
       dashboardPath: '/hospital/dashboard',
-      userData: { id: 'H-001', role: 'hospital' as const, name: 'Reception Staff' }
+      role: 'receptionist'
     },
     'Pharmacist': {
       dashboardPath: '/pharmacy/dashboard',
-      userData: { id: 'PH-001', role: 'pharmacist' as const, name: 'Pharmacy Staff' }
+      role: 'pharmacist'
     },
     'Lab Technician': {
       dashboardPath: '/lab/dashboard',
-      userData: { id: 'LAB-001', role: 'lab_technician' as const, name: 'Lab Technician' }
+      role: 'labtech'
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!credentials.role) {
-      alert('Please select a role');
+    
+    if (!credentials.email || !credentials.password || !credentials.role) {
+      showToast('Please fill in all required fields', 'error');
       return;
     }
     
-    const config = roleConfig[credentials.role as keyof typeof roleConfig];
-    login(config.userData);
-    navigate(config.dashboardPath);
+    if (isSignUp && !fullName) {
+      showToast('Please enter your full name', 'error');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const config = roleConfig[credentials.role as keyof typeof roleConfig];
+      
+      if (isSignUp) {
+        await signUp(credentials.email, credentials.password, {
+          full_name: fullName,
+          role: config.role
+        });
+        showToast('Account created successfully! Please check your email to verify your account.', 'success');
+        setIsSignUp(false);
+      } else {
+        await signIn(credentials.email, credentials.password);
+        navigate(config.dashboardPath);
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Authentication failed', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -73,16 +102,30 @@ export const UnifiedLoginForm: React.FC = () => {
             <Building2 size={32} className="text-black" />
           </div>
           <h1 className="text-2xl font-medium text-black mb-2">Hospital Management System</h1>
-          <p className="text-gray-600">Select your role and login</p>
+          <p className="text-gray-600">
+            {isSignUp ? 'Create your account' : 'Sign in to your account'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isSignUp && (
+            <FormField
+              label="Full Name"
+              name="fullName"
+              type="text"
+              placeholder="Enter your full name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+          )}
+
           <FormField
-            label="Username"
-            name="username"
-            type="text"
-            placeholder="Enter your username"
-            value={credentials.username}
+            label="Email"
+            name="email"
+            type="email"
+            placeholder="Enter your email"
+            value={credentials.email}
             onChange={handleChange}
             required
           />
@@ -107,10 +150,30 @@ export const UnifiedLoginForm: React.FC = () => {
             required
           />
 
-          <Button type="submit" fullWidth className="mt-6">
-            Login
+          <Button type="submit" fullWidth className="mt-6" loading={loading}>
+            {isSignUp ? 'Create Account' : 'Sign In'}
           </Button>
+          
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-sm text-gray-600 hover:text-black transition-colors"
+            >
+              {isSignUp 
+                ? 'Already have an account? Sign in' 
+                : "Don't have an account? Sign up"
+              }
+            </button>
+          </div>
         </form>
+        
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          isVisible={toast.isVisible}
+          onClose={hideToast}
+        />
       </Card>
     </div>
   );

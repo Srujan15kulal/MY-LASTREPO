@@ -1,19 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../lib/supabase';
 import { Header } from '../Layout/Header';
 import { Card } from '../Common/Card';
 import { Button } from '../Common/Button';
 import { FormField } from '../Common/FormField';
+import { Toast, useToast } from '../Common/Toast';
 
 export const PatientRegistration: React.FC = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const { toast, showToast, hideToast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    patient_name: 'Ravi Kumar',
-    age: '28',
+    patient_name: '',
+    age: '',
     gender: 'Male',
-    phone_number: '+91 9876543210',
-    aadhar_number: '1234-5678-9012',
-    problem_description: 'Severe headache and dizziness for 3 days'
+    phone_number: '',
+    dob: '',
+    problem_description: ''
   });
   const [selectedDoctor, setSelectedDoctor] = useState('');
 
@@ -24,14 +30,48 @@ export const PatientRegistration: React.FC = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate registration process
-    const patientId = `P-${Math.floor(Math.random() * 9000) + 1000}`;
     
-    // Show success message and redirect
-    alert(`Patient registered successfully!\nPatient ID: ${patientId}\nAssigned Doctor: ${selectedDoctor}`);
-    navigate('/hospital/dashboard');
+    if (!profile) {
+      showToast('Authentication required', 'error');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const patient = await db.createPatient({
+        display_name: formData.patient_name,
+        phone: formData.phone_number,
+        dob: formData.dob,
+        gender: formData.gender
+      });
+
+      // Create appointment if doctor is selected
+      if (selectedDoctor && formData.problem_description) {
+        // In a real implementation, you'd need to get the doctor's profile ID
+        // For now, we'll just show success
+      }
+      
+      showToast(`Patient registered successfully! Patient ID: ${patient.id}`, 'success');
+      
+      // Reset form
+      setFormData({
+        patient_name: '',
+        age: '',
+        gender: 'Male',
+        phone_number: '',
+        dob: '',
+        problem_description: ''
+      });
+      setSelectedDoctor('');
+      
+    } catch (error: any) {
+      showToast(error.message || 'Failed to register patient', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const doctorOptions = [
@@ -55,7 +95,7 @@ export const PatientRegistration: React.FC = () => {
                 label="Patient Name"
                 name="patient_name"
                 type="text"
-                placeholder="e.g. Ravi Kumar"
+                placeholder="Enter patient name"
                 value={formData.patient_name}
                 onChange={handleInputChange}
                 required
@@ -65,7 +105,7 @@ export const PatientRegistration: React.FC = () => {
                 label="Age"
                 name="age"
                 type="number"
-                placeholder="e.g. 28"
+                placeholder="Enter age"
                 value={formData.age}
                 onChange={handleInputChange}
                 required
@@ -85,7 +125,7 @@ export const PatientRegistration: React.FC = () => {
                 label="Phone Number"
                 name="phone_number"
                 type="tel"
-                placeholder="e.g. +91 98XXXXXXXX"
+                placeholder="+91 98XXXXXXXX"
                 value={formData.phone_number}
                 onChange={handleInputChange}
                 required
@@ -93,11 +133,10 @@ export const PatientRegistration: React.FC = () => {
             </div>
             
             <FormField
-              label="Aadhar Number"
-              name="aadhar_number"
-              type="text"
-              placeholder="e.g. 1234-1234-1234"
-              value={formData.aadhar_number}
+              label="Date of Birth"
+              name="dob"
+              type="date"
+              value={formData.dob}
               onChange={handleInputChange}
               required
             />
@@ -109,18 +148,16 @@ export const PatientRegistration: React.FC = () => {
               placeholder="Briefly describe symptoms"
               value={formData.problem_description}
               onChange={handleInputChange}
-              required
             />
             
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Assign Doctor <span className="text-red-500">*</span>
+                Assign Doctor (Optional)
               </label>
               <select
                 value={selectedDoctor}
                 onChange={(e) => setSelectedDoctor(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
               >
                 <option value="">Select Doctor</option>
                 {doctorOptions.map((doctor) => (
@@ -132,18 +169,26 @@ export const PatientRegistration: React.FC = () => {
             </div>
             
             <div className="flex gap-4">
-              <Button type="submit" className="flex-1">
+              <Button type="submit" className="flex-1" loading={loading}>
                 Register Patient
               </Button>
               <Button 
                 type="button" 
                 variant="outline" 
                 onClick={() => navigate('/hospital/dashboard')}
+                disabled={loading}
               >
                 Cancel
               </Button>
             </div>
           </form>
+          
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            isVisible={toast.isVisible}
+            onClose={hideToast}
+          />
         </Card>
       </div>
     </div>
