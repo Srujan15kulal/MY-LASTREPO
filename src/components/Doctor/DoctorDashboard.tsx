@@ -614,7 +614,7 @@ export const DoctorDashboard: React.FC = () => {
                     <p className="text-sm text-gray-600">{appointment.problem_summary}</p>
                   </div>
                 </div>
-                  <h2 className="text-xl font-semibold text-black">{selectedPatient.display_name}</h2>
+                <div className="text-right">
                   <p className="font-medium text-gray-900">{new Date(appointment.scheduled_at).toLocaleTimeString()}</p>
                   <p className="text-sm text-gray-600">{appointment.status}</p>
                 </div>
