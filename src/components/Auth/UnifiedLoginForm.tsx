@@ -54,6 +54,17 @@ export const UnifiedLoginForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check if Supabase is configured
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseAnonKey || 
+        supabaseUrl === 'your_supabase_project_url' || 
+        supabaseAnonKey === 'your_supabase_anon_key') {
+      showToast('Please configure Supabase environment variables in your .env file', 'error');
+      return;
+    }
+    
     if (!credentials.email || !credentials.password || !credentials.role) {
       showToast('Please fill in all required fields', 'error');
       return;
@@ -81,7 +92,19 @@ export const UnifiedLoginForm: React.FC = () => {
         navigate(config.dashboardPath);
       }
     } catch (error: any) {
-      showToast(error.message || 'Authentication failed', 'error');
+      let errorMessage = 'Authentication failed';
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please check your email and click the verification link before signing in.';
+      } else if (error.message?.includes('environment variables')) {
+        errorMessage = 'Application not configured. Please contact support.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
     }

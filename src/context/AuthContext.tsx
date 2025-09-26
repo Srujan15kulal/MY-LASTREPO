@@ -37,20 +37,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Check for existing session
     const initializeAuth = async () => {
       try {
-        const currentUser = await auth.getCurrentUser();
-        if (currentUser) {
-          const userProfile = await auth.getUserProfile();
-          if (userProfile) {
-            setUser({
-              id: userProfile.id,
-              role: userProfile.role as any,
-              name: userProfile.full_name
-            });
-            setProfile(userProfile);
+        // Check if Supabase is properly configured
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseAnonKey || 
+            supabaseUrl === 'your_supabase_project_url' || 
+            supabaseAnonKey === 'your_supabase_anon_key') {
+          console.warn('Supabase not configured. Please set up your environment variables.');
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const currentUser = await auth.getCurrentUser();
+          if (currentUser) {
+            const userProfile = await auth.getUserProfile();
+            if (userProfile) {
+              setUser({
+                id: userProfile.id,
+                role: userProfile.role as any,
+                name: userProfile.full_name
+              });
+              setProfile(userProfile);
+            }
+          }
+        } catch (authError: any) {
+          // Don't throw error for missing session on initial load
+          if (!authError.message?.includes('session missing')) {
+            console.error('Auth initialization error:', authError);
           }
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error('Auth configuration error:', error);
       } finally {
         setLoading(false);
       }
